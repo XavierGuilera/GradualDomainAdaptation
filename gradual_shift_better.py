@@ -60,6 +60,7 @@ def run_experiment_simple(
         return teacher
 
     def run(seed):
+        utils.rand_seed(seed)
         trg_eval_x = trg_val_x
         trg_eval_y = trg_val_y
 
@@ -220,7 +221,7 @@ def experiment_results(save_name):
 
 
 def rotated_mnist_60_conv_experiment():
-    set_seed(42)
+    # set_seed(42)
     run_experiment(
         dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv.dat',
@@ -228,13 +229,13 @@ def rotated_mnist_60_conv_experiment():
         soft=False, conf_q=0.1, num_runs=5)
 
 
-def set_seed(seed=42):
-    tf.random.set_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+# def set_seed(seed=42):
+#     tf.random.set_seed(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
 
 def rotated_mnist_60_conv_experiment_simple():
-    set_seed(42)
+    # set_seed(42)
     run_experiment_simple(
         dataset_func=datasets.rotated_mnist_60_data_func_simple,  
         n_classes=10,  

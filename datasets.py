@@ -224,7 +224,7 @@ def high_d_gaussians(d, var, n):
 def get_preprocessed_mnist():
     (train_x, train_y), (test_x, test_y) = mnist.load_data()
     train_x, test_x = train_x / 255.0, test_x / 255.0
-    train_x, train_y = shuffle(train_x, train_y,random_state=42) #Randomly shuffle the training data to avoid the model's dependence on the order of the data during training and maintain the model's generalization ability
+    train_x, train_y = shuffle(train_x, train_y) #Randomly shuffle the training data to avoid the model's dependence on the order of the data during training and maintain the model's generalization ability
     train_x = np.expand_dims(np.array(train_x), axis=-1) #Adjust the shape of the input data from (60000, 28, 28) to (60000, 28, 28, 1)
     test_x = np.expand_dims(np.array(test_x), axis=-1)
     return (train_x, train_y), (test_x, test_y)
