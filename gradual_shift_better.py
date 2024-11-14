@@ -1,7 +1,7 @@
 
 import utils
 import models
-import datasets
+from datasets import *
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import metrics
@@ -235,7 +235,7 @@ def experiment_results(save_name):
 def rotated_mnist_60_conv_experiment(save_file):
     set_seed(42)
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func(), n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file=save_file,
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -252,7 +252,7 @@ def set_seed(seed=42):
 def rotated_mnist_60_conv_experiment_simple(save_file):
     set_seed(42)
     run_experiment_simple(
-        dataset_func=datasets.rotated_mnist_60_data_func_simple,
+        dataset_func=datasets.rotated_mnist_60_data_func_simple(),
         n_classes=10,
         input_shape=None,
         save_file=save_file,
