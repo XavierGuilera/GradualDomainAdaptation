@@ -25,7 +25,8 @@ def self_train_once_simple(student, teacher, unsup_x, confidence_q=0.1):
     confidence = np.amax(logits, axis=1) - np.amin(logits, axis=1)  
     alpha = np.quantile(confidence, confidence_q) 
     indices = np.argwhere(confidence >= alpha)[:, 0]  
-    preds = np.argmax(logits, axis=1) 
+    preds = np.argmax(logits, axis=1)
+    print(np.unique(preds[indices]))
     student.fit(unsup_x[indices], preds[indices])  
 
 

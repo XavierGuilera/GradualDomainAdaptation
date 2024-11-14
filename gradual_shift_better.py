@@ -23,19 +23,24 @@ import random
 
 # SIYI:
 def new_model_simple():
-    #model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs',max_iter=1000)  # max_iter 确保收敛
+
+    # model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs',max_iter=1000)
+
     # model = RandomForestClassifier(
     #     n_estimators=100,  
     #     max_depth=50,  
     #     min_samples_split=5, 
     #     min_samples_leaf=2,  
     #     bootstrap=True,  
-    #     random_state=42  
-    # )
+    #     random_state=42)
+
     #model = GaussianNB()
+
     model = SVC(kernel='linear', probability=True, random_state=42, C=0.1, class_weight='balanced')
     # model = SVC(kernel='rbf',probability=True, random_state=42,C=1.0, gamma=0.1,class_weight='balanced')
-    #model = LDA()
+
+    # model = LDA()
+
     # model = lgb.LGBMClassifier(
     # boosting_type='gbdt', 
     # num_leaves=31,  
@@ -44,8 +49,7 @@ def new_model_simple():
     # max_depth=-1,  
     # random_state=42,
     # force_col_wise=True,
-    # verbosity=-1
-    # )
+    # verbosity=-1)
     return model
 
 
@@ -54,7 +58,6 @@ def run_experiment_simple(
     dataset_func, n_classes, input_shape, save_file, model_func=new_model_simple,
     interval=2000, soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
 
-   
     (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
         trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
 
@@ -79,7 +82,7 @@ def run_experiment_simple(
         # Gradual self-training.
         print("\n\n Gradual self-training:")
         teacher = new_model_simple()
-        teacher.fit(src_tr_x, src_tr_y)  #Train the teacher model
+        teacher.fit(src_tr_x, src_tr_y)  # Train the teacher model
         gradual_accuracies, student = utils.gradual_self_train_simple(
             student_func, teacher, inter_x, inter_y, interval, soft=soft,
             confidence_q=conf_q)
@@ -87,7 +90,7 @@ def run_experiment_simple(
         gradual_accuracies.append(acc)
         for i, acc in enumerate(gradual_accuracies):
             print(f"Gradual self-training accuracy after step {i+1}: {acc * 100:.2f}%")
-
+        '''
         # Direct bootstrap to target.
         print("\n\n Direct bootstrap to target:")
         teacher = new_model_simple()
@@ -107,8 +110,9 @@ def run_experiment_simple(
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
         for i, acc in enumerate(all_accuracies):
             print(f"Direct bootstrap to all unsup data accuracy after step {i+1}: {acc * 100:.2f}%")
-
-        return src_acc, target_acc, gradual_accuracies, target_accuracies, all_accuracies
+        '''
+        # return src_acc, target_acc, gradual_accuracies, target_accuracies, all_accuracies
+        return src_acc, target_acc, gradual_accuracies
 
     results = []
     for i in range(num_runs):
@@ -159,11 +163,13 @@ def run_experiment(
         utils.rand_seed(seed)
         trg_eval_x = trg_val_x
         trg_eval_y = trg_val_y
+
         # Train source model.
         source_model = new_model()
         source_model.fit(src_tr_x, src_tr_y, epochs=epochs, verbose=False)
         _, src_acc = source_model.evaluate(src_val_x, src_val_y)
         _, target_acc = source_model.evaluate(trg_eval_x, trg_eval_y)
+
         # Gradual self-training.
         print("\n\n Gradual self-training:")
         teacher = new_model()
@@ -173,6 +179,7 @@ def run_experiment(
             confidence_q=conf_q)
         _, acc = student.evaluate(trg_eval_x, trg_eval_y)
         gradual_accuracies.append(acc)
+
         # Train to target.
         print("\n\n Direct boostrap to target:")  
         teacher = new_model()
@@ -228,7 +235,7 @@ def experiment_results(save_name):
 def rotated_mnist_60_conv_experiment(save_file):
     set_seed(42)
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=datasets.rotated_mnist_60_data_func(), n_classes=10, input_shape=(28, 28, 1),
         save_file=save_file,
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
