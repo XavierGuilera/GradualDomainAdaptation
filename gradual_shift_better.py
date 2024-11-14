@@ -235,7 +235,7 @@ def experiment_results(save_name):
 def rotated_mnist_60_conv_experiment(save_file):
     set_seed(42)
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file=save_file,
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -252,7 +252,7 @@ def set_seed(seed=42):
 def rotated_mnist_60_conv_experiment_simple(save_file):
     set_seed(42)
     run_experiment_simple(
-        dataset_func=datasets.rotated_mnist_60_data_func_simple(),
+        dataset_func=rotated_mnist_60_data_func_simple,
         n_classes=10,
         input_shape=None,
         save_file=save_file,
@@ -266,7 +266,7 @@ def rotated_mnist_60_conv_experiment_simple(save_file):
 
 def portraits_conv_experiment():
     run_experiment(
-        dataset_func=datasets.portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
+        dataset_func=portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
         save_file='saved_files/portraits.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=20, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -275,7 +275,7 @@ def portraits_conv_experiment():
 def gaussian_linear_experiment():
     d = 100        
     run_experiment(
-        dataset_func=lambda: datasets.gaussian_data_func(d), n_classes=2, input_shape=(d,),
+        dataset_func=lambda: gaussian_data_func(d), n_classes=2, input_shape=(d,),
         save_file='saved_files/gaussian.dat',
         model_func=models.linear_softmax_model, interval=500, epochs=100, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -285,7 +285,7 @@ def gaussian_linear_experiment():
 
 def rotated_mnist_60_conv_experiment_noconf():
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv_noconf.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.0, num_runs=5)
@@ -293,7 +293,7 @@ def rotated_mnist_60_conv_experiment_noconf():
 
 def portraits_conv_experiment_noconf():
     run_experiment(
-        dataset_func=datasets.portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
+        dataset_func=portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
         save_file='saved_files/portraits_noconf.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=20, loss='ce',
         soft=False, conf_q=0.0, num_runs=5)
@@ -302,7 +302,7 @@ def portraits_conv_experiment_noconf():
 def gaussian_linear_experiment_noconf():
     d = 100        
     run_experiment(
-        dataset_func=lambda: datasets.gaussian_data_func(d), n_classes=2, input_shape=(d,),
+        dataset_func=lambda: gaussian_data_func(d), n_classes=2, input_shape=(d,),
         save_file='saved_files/gaussian_noconf.dat',
         model_func=models.linear_softmax_model, interval=500, epochs=100, loss='ce',
         soft=False, conf_q=0.0, num_runs=5)
@@ -310,7 +310,7 @@ def gaussian_linear_experiment_noconf():
 
 def portraits_64_conv_experiment():
     run_experiment(
-        dataset_func=datasets.portraits_64_data_func, n_classes=2, input_shape=(64, 64, 1),
+        dataset_func=portraits_64_data_func, n_classes=2, input_shape=(64, 64, 1),
         save_file='saved_files/portraits_64.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=20, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -319,7 +319,7 @@ def portraits_64_conv_experiment():
 # Using a data generation method called "dialing ratios"
 def dialing_ratios_mnist_experiment():
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_dialing_ratios_data_func,
+        dataset_func=rotated_mnist_60_dialing_ratios_data_func,
         n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/dialing_rot_mnist_60_conv.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
@@ -328,7 +328,7 @@ def dialing_ratios_mnist_experiment():
 
 def portraits_conv_experiment_more():
     run_experiment(
-        dataset_func=datasets.portraits_data_func_more, n_classes=2, input_shape=(32, 32, 1),
+        dataset_func=portraits_data_func_more, n_classes=2, input_shape=(32, 32, 1),
         save_file='saved_files/portraits_more.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=20, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -336,7 +336,7 @@ def portraits_conv_experiment_more():
 
 def rotated_mnist_60_conv_experiment_smaller_interval():
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv_smaller_interval.dat',
         model_func=models.simple_softmax_conv_model, interval=1000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5, num_repeats=7)
@@ -344,7 +344,7 @@ def rotated_mnist_60_conv_experiment_smaller_interval():
 
 def portraits_conv_experiment_smaller_interval():
     run_experiment(
-        dataset_func=datasets.portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
+        dataset_func=portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
         save_file='saved_files/portraits_smaller_interval.dat',
         model_func=models.simple_softmax_conv_model, interval=1000, epochs=20, loss='ce',
         soft=False, conf_q=0.1, num_runs=5, num_repeats=7)
@@ -353,7 +353,7 @@ def portraits_conv_experiment_smaller_interval():
 def gaussian_linear_experiment_smaller_interval():
     d = 100        
     run_experiment(
-        dataset_func=lambda: datasets.gaussian_data_func(d), n_classes=2, input_shape=(d,),
+        dataset_func=lambda: gaussian_data_func(d), n_classes=2, input_shape=(d,),
         save_file='saved_files/gaussian_smaller_interval.dat',
         model_func=models.linear_softmax_model, interval=250, epochs=100, loss='ce',
         soft=False, conf_q=0.1, num_runs=5, num_repeats=7)
@@ -362,7 +362,7 @@ def gaussian_linear_experiment_smaller_interval():
 
 def rotated_mnist_60_conv_experiment_more_epochs():
     run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+        dataset_func=rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv_more_epochs.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=15, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -370,7 +370,7 @@ def rotated_mnist_60_conv_experiment_more_epochs():
 
 def portraits_conv_experiment_more_epochs():
     run_experiment(
-        dataset_func=datasets.portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
+        dataset_func=portraits_data_func, n_classes=2, input_shape=(32, 32, 1),
         save_file='saved_files/portraits_more_epochs.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=30, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
@@ -379,7 +379,7 @@ def portraits_conv_experiment_more_epochs():
 def gaussian_linear_experiment_more_epochs():
     d = 100        
     run_experiment(
-        dataset_func=lambda: datasets.gaussian_data_func(d), n_classes=2, input_shape=(d,),
+        dataset_func=lambda: gaussian_data_func(d), n_classes=2, input_shape=(d,),
         save_file='saved_files/gaussian_more_epochs.dat',
         model_func=models.linear_softmax_model, interval=500, epochs=150, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
