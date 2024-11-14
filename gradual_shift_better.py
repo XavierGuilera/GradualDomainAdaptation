@@ -136,8 +136,7 @@ def train_model_source(model, split_data, epochs=1000):     # epochs, the number
 def run_experiment(
     dataset_func, n_classes, input_shape, save_file, model_func=models.simple_softmax_conv_model,
     interval=2000, epochs=10, loss='ce', soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
-    (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
-        trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
+    (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y, trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
     if soft:    # Set the position corresponding to the class with the highest probability to 1, and the rest to 0
         src_tr_y = to_categorical(src_tr_y)
         src_val_y = to_categorical(src_val_y)
@@ -226,13 +225,14 @@ def experiment_results(save_name):
           mult * np.std(best_alls) / np.sqrt(num_runs))
 
 
-def rotated_mnist_60_conv_experiment():
+def rotated_mnist_60_conv_experiment(save_file):
     set_seed(42)
     run_experiment(
         dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
-        save_file='saved_files/rot_mnist_60_conv.dat',
+        save_file=save_file,
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
+
 
 # SIYI:
 def set_seed(seed=42):
@@ -242,18 +242,18 @@ def set_seed(seed=42):
 
 
 # SIYI:
-def rotated_mnist_60_conv_experiment_simple():
+def rotated_mnist_60_conv_experiment_simple(save_file):
     set_seed(42)
     run_experiment_simple(
-        dataset_func=datasets.rotated_mnist_60_data_func_simple,  
-        n_classes=10,  
-        input_shape=None, 
-        save_file='saved_files/rot_mnist_60_conv.dat',  
-        model_func=new_model_simple,  
-        interval=2000,  
-        soft=False,  
-        conf_q=0.1,  
-        num_runs=5  
+        dataset_func=datasets.rotated_mnist_60_data_func_simple,
+        n_classes=10,
+        input_shape=None,
+        save_file=save_file,
+        model_func=new_model_simple,
+        interval=2000,
+        soft=False,
+        conf_q=0.1,
+        num_runs=5
     )
 
 
