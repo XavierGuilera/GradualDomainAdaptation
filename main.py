@@ -1,7 +1,7 @@
 from gradual_shift_better import rotated_mnist_60_conv_experiment_simple
 import pickle
 import matplotlib as plt
-
+from datasets import *
 
 def plot_results(results):
     # Steps vs Accuracies
@@ -22,13 +22,13 @@ def plot_results(results):
     plt.legend()
     plt.grid()
     plt.show()
-    plt.savefig("/content/GradualDomainAdaptation/saved_files/results_plot.png")
+    plt.savefig("/share/iscf/GradualDomainAdaptation/saved_files/results_plot.png")
 
 
 if __name__ == "__main__":
 
-    rotated_mnist_60_conv_experiment_simple("saved_files/rot_mnist_60_conv_svm1.dat")
-    with open('/content/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_svm1.dat', 'rb') as file:
+    rotated_mnist_60_conv_experiment_simple("/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_svm1.dat")
+    with open('/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_svm1.dat', 'rb') as file:
         results = pickle.load(file)
     print(results)
 

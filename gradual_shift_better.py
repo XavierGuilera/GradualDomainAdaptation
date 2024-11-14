@@ -2,6 +2,7 @@
 import utils
 import models
 from datasets import *
+from datasets import rotated_mnist_60_data_func_simple
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import metrics
@@ -37,7 +38,7 @@ def new_model_simple():
     #model = GaussianNB()
 
     model = SVC(kernel='linear', probability=True, random_state=42, C=0.1, class_weight='balanced')
-    # model = SVC(kernel='rbf',probability=True, random_state=42,C=1.0, gamma=0.1,class_weight='balanced')
+    # model = SVC(kernel='rbf',probability=True, random_state=42, C=1.0, gamma=0.1, class_weight='balanced')
 
     # model = LDA()
 
@@ -260,7 +261,7 @@ def rotated_mnist_60_conv_experiment_simple(save_file):
         interval=2000,
         soft=False,
         conf_q=0.1,
-        num_runs=5
+        num_runs=1
     )
 
 
