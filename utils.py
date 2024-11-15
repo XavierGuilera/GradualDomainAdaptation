@@ -15,7 +15,7 @@ def self_train_once(student, teacher, unsup_x, confidence_q=0.1, epochs=20):
     alpha = np.quantile(confidence, confidence_q)
     indices = np.argwhere(confidence >= alpha)[:, 0]
     preds = np.argmax(logits, axis=1)   # For each sample’s predicted probability distribution, select the category with the highest probability as the model’s predicted category, that is, generate a pseudo label for the sample
-    student.fit(unsup_x[indices], preds[indices], epochs=epochs, verbose=False)     # Train the student model with the selected high confidence samples and their corresponding pseudo labels
+    student.fit(unsup_x[indices], preds[indices], epochs=epochs, verbose=True)     # Train the student model with the selected high confidence samples and their corresponding pseudo labels
 
 
 # SIYI:
@@ -27,13 +27,13 @@ def self_train_once_simple(student, teacher, unsup_x, confidence_q=0.1):
     indices = np.argwhere(confidence >= alpha)[:, 0]  
     preds = np.argmax(logits, axis=1)
     print(np.unique(preds[indices]))
-    student.fit(unsup_x[indices], preds[indices])  
+    student.fit(unsup_x[indices], preds[indices])
 
 
 #Take the predicted probability distribution probs (soft labels) of all unlabeled data as the target and train the student model
 def soft_self_train_once(student, teacher, unsup_x, epochs=20):
     probs = teacher.predict(np.concatenate([unsup_x]))
-    student.fit(unsup_x, probs, epochs=epochs, verbose=False)
+    student.fit(unsup_x, probs, epochs=epochs, verbose=True)
 
 
 # SIYI:
@@ -128,8 +128,8 @@ def train_to_acc(model, acc, train_x, train_y, val_x, val_y):
     steps_per_epoch = int(data_size / 50.0 / batch_size)
     logger.info("train_xs size is %s", str(train_x.shape))
     while True:
-        model.fit(train_x, train_y, batch_size=batch_size, steps_per_epoch=steps_per_epoch, verbose=False)
-        val_accuracy = model.evaluate(val_x, val_y, verbose=False)[1]
+        model.fit(train_x, train_y, batch_size=batch_size, steps_per_epoch=steps_per_epoch, verbose=True)
+        val_accuracy = model.evaluate(val_x, val_y, verbose=True)[1]
         logger.info("validation accuracy is %f", val_accuracy)
         if val_accuracy >= acc:
             break

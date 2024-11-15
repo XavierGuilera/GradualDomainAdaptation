@@ -23,7 +23,7 @@ import random
 
 
 # SIYI:
-def new_model_simple():
+def new_model_simple(model_params):
 
     # model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs',max_iter=1000)
 
@@ -35,12 +35,13 @@ def new_model_simple():
     #     bootstrap=True,  
     #     random_state=42)
 
-    #model = GaussianNB()
-
-    model = SVC(kernel='linear', probability=True, random_state=42, C=0.1, class_weight='balanced')
-    # model = SVC(kernel='rbf',probability=True, random_state=42, C=1.0, gamma=0.1, class_weight='balanced')
-
+    # model = GaussianNB()
     # model = LDA()
+
+    model = SVC(kernel=model_params['kernel'], probability=True, random_state=42, C=model_params['C'],
+                gamma=model_params['gamma'], class_weight='balanced')
+    # model = SVC(kernel='linear', probability=True, random_state=42, C=0.1, class_weight='balanced')
+    # model = SVC(kernel='rbf',probability=True, random_state=42, C=1.0, gamma=0.1, class_weight='balanced')
 
     # model = lgb.LGBMClassifier(
     # boosting_type='gbdt', 
@@ -56,7 +57,7 @@ def new_model_simple():
 
 # SIYI:
 def run_experiment_simple(
-    dataset_func, n_classes, input_shape, save_file, model_func=new_model_simple,
+    dataset_func, n_classes, input_shape, save_file, model_params, model_func=new_model_simple,
     interval=2000, soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
 
     (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
@@ -73,16 +74,17 @@ def run_experiment_simple(
         trg_eval_y = trg_val_y
 
         # Train source model.
-        source_model = new_model_simple()
+        source_model = new_model_simple(model_params)
         source_model.fit(src_tr_x, src_tr_y)  #Train the source domain model
         src_acc = source_model.score(src_val_x, src_val_y)  #Evaluate the accuracy on the source domain validation set
         target_acc = source_model.score(trg_eval_x, trg_eval_y)  #Evaluate the accuracy on the target domain validation set
         print(f"Source validation accuracy (seed {seed}): {src_acc * 100:.2f}%")
         print(f"Target validation accuracy (seed {seed}): {target_acc * 100:.2f}%")
 
+        '''
         # Gradual self-training.
         print("\n\n Gradual self-training:")
-        teacher = new_model_simple()
+        teacher = new_model_simple(model_params)
         teacher.fit(src_tr_x, src_tr_y)  # Train the teacher model
         gradual_accuracies, student = utils.gradual_self_train_simple(
             student_func, teacher, inter_x, inter_y, interval, soft=soft,
@@ -91,10 +93,11 @@ def run_experiment_simple(
         gradual_accuracies.append(acc)
         for i, acc in enumerate(gradual_accuracies):
             print(f"Gradual self-training accuracy after step {i+1}: {acc * 100:.2f}%")
+
         '''
         # Direct bootstrap to target.
         print("\n\n Direct bootstrap to target:")
-        teacher = new_model_simple()
+        teacher = new_model_simple(model_params)
         teacher.fit(src_tr_x, src_tr_y)
         target_accuracies, _ = utils.self_train_simple(
             student_func, teacher, dir_inter_x, target_x=trg_eval_x,
@@ -104,16 +107,16 @@ def run_experiment_simple(
 
         # Direct bootstrap to all unsupervised data.
         print("\n\n Direct bootstrap to all unsup data:")
-        teacher = new_model_simple()
+        teacher = new_model_simple(model_params)
         teacher.fit(src_tr_x, src_tr_y)
         all_accuracies, _ = utils.self_train_simple(
             student_func, teacher, inter_x, target_x=trg_eval_x,
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
         for i, acc in enumerate(all_accuracies):
             print(f"Direct bootstrap to all unsup data accuracy after step {i+1}: {acc * 100:.2f}%")
-        '''
-        # return src_acc, target_acc, gradual_accuracies, target_accuracies, all_accuracies
-        return src_acc, target_acc, gradual_accuracies
+
+        # return src_acc, target_acc, gradual_accuracies  #, target_accuracies, all_accuracies
+        return src_acc, target_acc, target_accuracies, all_accuracies
 
     results = []
     for i in range(num_runs):
@@ -250,13 +253,14 @@ def set_seed(seed=42):
 
 
 # SIYI:
-def rotated_mnist_60_conv_experiment_simple(save_file):
+def rotated_mnist_60_conv_experiment_simple(model_params, save_file):
     set_seed(42)
     run_experiment_simple(
         dataset_func=rotated_mnist_60_data_func_simple,
         n_classes=10,
         input_shape=None,
         save_file=save_file,
+        model_params=model_params,
         model_func=new_model_simple,
         interval=2000,
         soft=False,
