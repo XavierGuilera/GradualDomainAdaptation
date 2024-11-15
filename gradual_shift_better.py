@@ -81,7 +81,7 @@ def run_experiment_simple(
         print(f"Source validation accuracy (seed {seed}): {src_acc * 100:.2f}%")
         print(f"Target validation accuracy (seed {seed}): {target_acc * 100:.2f}%")
 
-        '''
+
         # Gradual self-training.
         print("\n\n Gradual self-training:")
         teacher = new_model_simple(model_params)
@@ -114,9 +114,9 @@ def run_experiment_simple(
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
         for i, acc in enumerate(all_accuracies):
             print(f"Direct bootstrap to all unsup data accuracy after step {i+1}: {acc * 100:.2f}%")
-
-        # return src_acc, target_acc, gradual_accuracies  #, target_accuracies, all_accuracies
-        return src_acc, target_acc, target_accuracies, all_accuracies
+        '''
+        return src_acc, target_acc, gradual_accuracies  #, target_accuracies, all_accuracies
+        # return src_acc, target_acc, target_accuracies, all_accuracies
 
     results = []
     for i in range(num_runs):

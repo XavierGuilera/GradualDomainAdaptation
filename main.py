@@ -9,8 +9,8 @@ def plot_results(model):
     with open(f'/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_{model}.dat', 'rb') as file:
         results = pickle.load(file)
     print(results)
-    experiments = ["Boot2Target", "Boot2Unsupervised"]
-    #experiments = ["Gradual"]
+    # experiments = ["Gradual", "Boot2Target", "Boot2Unsupervised"]
+    experiments = ["Gradual"]
     idx = 2
     plt.figure(figsize=(14, 10))
     for exp in experiments:
@@ -34,11 +34,9 @@ def plot_results(model):
 
 if __name__ == "__main__":
 
-    svm1 = {'kernel': 'rbf', 'C': 0.1, 'gamma': 1, 'id': "svm1"}
+    svm1 = {'kernel': 'rbf', 'C': 1, 'gamma': 0.1, 'id': "svm1"}
 
-    # svm2 = {'kernel': 'rbf', 'C': 1, 'gamma': 0.1, 'id': "svm2"}  # crashes
-    svm2 = {'kernel': 'rbf', 'C': 0.8, 'gamma': 0.2, 'id': "svm2"}
-
+    svm2 = {'kernel': 'rbf', 'C': 0.8, 'gamma': 0.2, 'id': "svm2"}  # crashes
     svm3 = {'kernel': 'rbf', 'C': 1, 'gamma': 1, 'id': "svm3"}      # crashes
     svm4 = {'kernel': 'rbf', 'C': 0.1, 'gamma': 0.1, 'id': "svm4"}  # crashes
     svm5 = {'kernel': 'rbf', 'C': 0.5, 'gamma': 0.5, 'id': "svm5"}  # crashes
@@ -49,16 +47,15 @@ if __name__ == "__main__":
     svm8 = {'kernel': 'linear', 'C': 0.5, 'gamma': 1, 'id': "svm8"}
 
 
+    models = [svm1]
 
-
-    models = [svm7]
-    '''
     for i in range(len(models)):
         model = models[i]['id']
         print(model)
-        rotated_mnist_60_conv_experiment_simple(models[i-1], f"/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_{model}.dat")
+        rotated_mnist_60_conv_experiment_simple(models[i], f"/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_{model}.dat")
         plot_results(model)
     '''
-    model = "svm1"
+    model = "LDA"
     # rotated_mnist_60_conv_experiment_simple(f"/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_{model}.dat")
     plot_results(model)
+    '''
