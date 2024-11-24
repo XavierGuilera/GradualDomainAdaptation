@@ -10,6 +10,7 @@ from tensorflow.keras.datasets import mnist
 from tensorflow.keras.utils import to_categorical
 import pickle
 
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -23,41 +24,91 @@ import random
 
 
 # SIYI:
-def new_model_simple(model_params):
+def new_model_simple(model, model_params):
 
-    # model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs',max_iter=1000)
+    if "KNN with kernel" == model:
+        def gaussian_kernel(distances):
+            sigma = 1.0
+            weights = np.exp(-distances ** 2 / (2 * sigma ** 2))
+            return weights
 
-    # model = RandomForestClassifier(
-    #     n_estimators=100,  
-    #     max_depth=50,  
-    #     min_samples_split=5, 
-    #     min_samples_leaf=2,  
-    #     bootstrap=True,  
-    #     random_state=42)
+        model = KNeighborsClassifier(n_neighbors=10, weights=gaussian_kernel)
 
-    # model = GaussianNB()
-    # model = LDA()
+    if "KNN without kernel" == model:
+        model = KNeighborsClassifier(n_neighbors=10, weights='distance')
 
-    model = SVC(kernel=model_params['kernel'], probability=True, random_state=42, C=model_params['C'],
-                gamma=model_params['gamma'], class_weight='balanced')
-    # model = SVC(kernel='linear', probability=True, random_state=42, C=0.1, class_weight='balanced')
-    # model = SVC(kernel='rbf',probability=True, random_state=42, C=1.0, gamma=0.1, class_weight='balanced')
+    if "Random Forest" == model:
+        model = RandomForestClassifier(
+                     n_estimators=100,
+                     max_depth=50,
+                     min_samples_split=5,
+                     min_samples_leaf=2,
+                     bootstrap=True,
+                     random_state=42)
 
-    # model = lgb.LGBMClassifier(
-    # boosting_type='gbdt', 
-    # num_leaves=31,  
-    # learning_rate=0.1, 
-    # n_estimators=100, 
-    # max_depth=-1,  
-    # random_state=42,
-    # force_col_wise=True,
-    # verbosity=-1)
+    if "GaussianNB" == model:
+        model = GaussianNB()
+
+    if "LDA" == model:
+        model = LDA()
+
+    if "SVC" == model:
+        model = SVC(kernel=model_params['kernel'], probability=True, random_state=42, C=model_params['C'],
+                    gamma=model_params['gamma'], class_weight='balanced')
+
+    if "LGBM" == model:
+        model = lgb.LGBMClassifier(
+                    boosting_type='gbdt',
+                    num_leaves=31,
+                    learning_rate=0.1,
+                    n_estimators=100,
+                    max_depth=-1,
+                    random_state=42,
+                    force_col_wise=True,
+                    verbosity=-1)
+
+    if "Logistic Regression" == model:
+        model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs', max_iter=1000)
+
     return model
+
+
+#SIYI:
+def calculate_ece(probs, labels, num_bins=10):
+    bin_boundaries = np.linspace(0.0, 1.0, num_bins + 1)
+    bin_lowers, bin_uppers = bin_boundaries[:-1], bin_boundaries[1:]
+    confidences = np.max(probs, axis=1)
+    predictions = np.argmax(probs, axis=1)
+    accuracies = (predictions == labels)
+
+    ece = 0.0
+    bin_accs, bin_confs, bin_counts = [], [], []
+
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        if np.isclose(bin_upper, 1.0):
+            in_bin = (confidences >= bin_lower) & (confidences <= bin_upper)
+        else:
+            in_bin = (confidences >= bin_lower) & (confidences < bin_upper)
+
+        prop_in_bin = in_bin.mean()
+        if prop_in_bin > 0:
+            bin_accuracy = accuracies[in_bin].mean()
+            bin_confidence = confidences[in_bin].mean()
+            bin_accs.append(bin_accuracy)
+            bin_confs.append(bin_confidence)
+            bin_counts.append(prop_in_bin)
+            ece += np.abs(bin_confidence - bin_accuracy) * prop_in_bin
+
+            print(f"Bin [{bin_lower:.2f}, {bin_upper:.2f}]: "
+                  f"Confidence = {bin_confidence:.2f}, Accuracy = {bin_accuracy:.2f}, "
+                  f"Proportion = {prop_in_bin:.2f}")
+
+    return ece, bin_accs, bin_confs
 
 
 # SIYI:
 def run_experiment_simple(
-    dataset_func, n_classes, input_shape, save_file, model_params, model_func=new_model_simple,
+    dataset_func, n_classes, input_shape, save_file, model, model_params, model_func=new_model_simple,
     interval=2000, soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
 
     (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
@@ -70,21 +121,30 @@ def run_experiment_simple(
         return teacher
 
     def run(seed):
+        utils.rand_seed(seed)
         trg_eval_x = trg_val_x
         trg_eval_y = trg_val_y
 
         # Train source model.
-        source_model = new_model_simple(model_params)
-        source_model.fit(src_tr_x, src_tr_y)  #Train the source domain model
-        src_acc = source_model.score(src_val_x, src_val_y)  #Evaluate the accuracy on the source domain validation set
-        target_acc = source_model.score(trg_eval_x, trg_eval_y)  #Evaluate the accuracy on the target domain validation set
+        '''
+        source_model = new_model_simple(model, model_params)
+        source_model.fit(src_tr_x, src_tr_y)
+        _, src_acc = source_model.evaluate(src_val_x, src_val_y)
+        _, target_acc = source_model.evaluate(trg_eval_x, trg_eval_y)
+        '''
+        source_model = new_model_simple(model, model_params)
+        source_model.fit(src_tr_x, src_tr_y)  # Train the source domain model
+        src_acc = source_model.score(src_val_x, src_val_y)  # Evaluate the accuracy on the source domain validation set
+        target_acc = source_model.score(trg_eval_x,
+                                        trg_eval_y)  # Evaluate the accuracy on the target domain validation set
+        src_probs = source_model.predict_proba(src_val_x)  ######Add this line######
+        src_ece, src_bin_accs, src_bin_confs = calculate_ece(src_probs, src_val_y)  ######Add this line######
         print(f"Source validation accuracy (seed {seed}): {src_acc * 100:.2f}%")
         print(f"Target validation accuracy (seed {seed}): {target_acc * 100:.2f}%")
 
-
         # Gradual self-training.
         print("\n\n Gradual self-training:")
-        teacher = new_model_simple(model_params)
+        teacher = new_model_simple(model, model_params)
         teacher.fit(src_tr_x, src_tr_y)  # Train the teacher model
         gradual_accuracies, student = utils.gradual_self_train_simple(
             student_func, teacher, inter_x, inter_y, interval, soft=soft,
@@ -92,12 +152,15 @@ def run_experiment_simple(
         acc = student.score(trg_eval_x, trg_eval_y)
         gradual_accuracies.append(acc)
         for i, acc in enumerate(gradual_accuracies):
-            print(f"Gradual self-training accuracy after step {i+1}: {acc * 100:.2f}%")
+            print(f"Gradual self-training accuracy after step {i + 1}: {acc * 100:.2f}%")
 
-        '''
+        gradual_probs = student.predict_proba(trg_eval_x)  ######Add this line######
+        gradual_ece, gradual_bin_accs, gradual_bin_confs = calculate_ece(gradual_probs,
+                                                                         trg_eval_y)  ######Add this line######
+
         # Direct bootstrap to target.
         print("\n\n Direct bootstrap to target:")
-        teacher = new_model_simple(model_params)
+        teacher = new_model_simple(model, model_params)
         teacher.fit(src_tr_x, src_tr_y)
         target_accuracies, _ = utils.self_train_simple(
             student_func, teacher, dir_inter_x, target_x=trg_eval_x,
@@ -107,16 +170,17 @@ def run_experiment_simple(
 
         # Direct bootstrap to all unsupervised data.
         print("\n\n Direct bootstrap to all unsup data:")
-        teacher = new_model_simple(model_params)
+        teacher = new_model_simple(model, model_params)
         teacher.fit(src_tr_x, src_tr_y)
         all_accuracies, _ = utils.self_train_simple(
             student_func, teacher, inter_x, target_x=trg_eval_x,
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
         for i, acc in enumerate(all_accuracies):
             print(f"Direct bootstrap to all unsup data accuracy after step {i+1}: {acc * 100:.2f}%")
-        '''
-        return src_acc, target_acc, gradual_accuracies  #, target_accuracies, all_accuracies
-        # return src_acc, target_acc, target_accuracies, all_accuracies
+
+        return (src_acc, target_acc, gradual_accuracies, target_accuracies, all_accuracies, src_probs, gradual_probs,
+                src_ece, src_bin_accs, src_bin_confs, gradual_ece, gradual_bin_accs, gradual_bin_confs)
+
 
     results = []
     for i in range(num_runs):
@@ -177,7 +241,7 @@ def run_experiment(
         # Gradual self-training.
         print("\n\n Gradual self-training:")
         teacher = new_model()
-        teacher.set_weights(source_model.get_weights()) 
+        teacher.set_weights(source_model.get_weights())
         gradual_accuracies, student = utils.gradual_self_train(
             student_func, teacher, inter_x, inter_y, interval, epochs=epochs, soft=soft,
             confidence_q=conf_q)
@@ -185,13 +249,13 @@ def run_experiment(
         gradual_accuracies.append(acc)
 
         # Train to target.
-        print("\n\n Direct boostrap to target:")  
+        print("\n\n Direct boostrap to target:")
         teacher = new_model()
         teacher.set_weights(source_model.get_weights())
         target_accuracies, _ = utils.self_train(
             student_func, teacher, dir_inter_x, epochs=epochs, target_x=trg_eval_x,
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
-        print("\n\n Direct boostrap to all unsup data:") 
+        print("\n\n Direct boostrap to all unsup data:")
         teacher = new_model()
         teacher.set_weights(source_model.get_weights())
         all_accuracies, _ = utils.self_train(
@@ -237,29 +301,31 @@ def experiment_results(save_name):
 
 
 def rotated_mnist_60_conv_experiment(save_file):
-    set_seed(42)
+    # set_seed(42)
     run_experiment(
         dataset_func=rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
         save_file=save_file,
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
         soft=False, conf_q=0.1, num_runs=5)
 
-
+'''
 # SIYI:
 def set_seed(seed=42):
     tf.random.set_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+'''
 
 
 # SIYI:
-def rotated_mnist_60_conv_experiment_simple(model_params, save_file):
-    set_seed(42)
+def rotated_mnist_60_conv_experiment_simple(model, model_params, save_file):
+    # set_seed(42)
     run_experiment_simple(
         dataset_func=rotated_mnist_60_data_func_simple,
         n_classes=10,
         input_shape=None,
         save_file=save_file,
+        model=model,
         model_params=model_params,
         model_func=new_model_simple,
         interval=2000,
