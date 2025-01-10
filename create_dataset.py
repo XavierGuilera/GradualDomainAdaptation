@@ -12,7 +12,8 @@ def resize(path, size=64):
         if os.path.isfile(path+item):
             im = Image.open(path+item)
             f, e = os.path.splitext(path+item)
-            imResize = im.resize((size,size), Image.ANTIALIAS)
+            # imResize = im.resize((size,size), Image.ANTIALIAS)  # XAVI: Image.ANTIALIAS seems to be outdated
+            imResize = im.resize((size, size), Image.LANCZOS)
             imResize.save(f + '.png', 'PNG')
 
 for folder in ['./dataset_32x32/M/', './dataset_32x32/F/']:
