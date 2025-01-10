@@ -22,15 +22,48 @@ import random
 
 #logging.getLogger("lightgbm").setLevel(logging.ERROR)
 
+#SIYI:
+def calculate_ece(probs, labels, num_bins=10):
+    bin_boundaries = np.linspace(0.0, 1.0, num_bins + 1)
+    bin_lowers, bin_uppers = bin_boundaries[:-1], bin_boundaries[1:]
+    confidences = np.max(probs, axis=1)
+    predictions = np.argmax(probs, axis=1)
+    accuracies = (predictions == labels)
+
+    ece = 0.0
+    bin_accs, bin_confs, bin_counts = [], [], []
+
+    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
+        if np.isclose(bin_upper, 1.0):
+            in_bin = (confidences >= bin_lower) & (confidences <= bin_upper)
+        else:
+            in_bin = (confidences >= bin_lower) & (confidences < bin_upper)
+
+        prop_in_bin = in_bin.mean()
+        if prop_in_bin > 0:
+            bin_accuracy = accuracies[in_bin].mean()
+            bin_confidence = confidences[in_bin].mean()
+            bin_accs.append(bin_accuracy)
+            bin_confs.append(bin_confidence)
+            bin_counts.append(prop_in_bin)
+            ece += np.abs(bin_confidence - bin_accuracy) * prop_in_bin
+
+            print(f"Bin [{bin_lower:.2f}, {bin_upper:.2f}]: "
+                  f"Confidence = {bin_confidence:.2f}, Accuracy = {bin_accuracy:.2f}, "
+                  f"Proportion = {prop_in_bin:.2f}")
+
+    return ece, bin_accs, bin_confs
+
+
+def gaussian_kernel(distances):
+    sigma = 1.0
+    weights = np.exp(-distances ** 2 / (2 * sigma ** 2))
+    return weights
 
 # SIYI:
 def new_model_simple(model, model_params):
 
     if "KNN with kernel" == model:
-        def gaussian_kernel(distances):
-            sigma = 1.0
-            weights = np.exp(-distances ** 2 / (2 * sigma ** 2))
-            return weights
 
         model = KNeighborsClassifier(n_neighbors=10, weights=gaussian_kernel)
 
@@ -68,42 +101,9 @@ def new_model_simple(model, model_params):
                     verbosity=-1)
 
     if "Logistic Regression" == model:
-        model = LogisticRegression(penalty='l2', C=0.1, solver='lbfgs', max_iter=1000)
+        model = LogisticRegression(penalty='l2', C=model_params['C'], solver='lbfgs', max_iter=1000)
 
     return model
-
-
-#SIYI:
-def calculate_ece(probs, labels, num_bins=10):
-    bin_boundaries = np.linspace(0.0, 1.0, num_bins + 1)
-    bin_lowers, bin_uppers = bin_boundaries[:-1], bin_boundaries[1:]
-    confidences = np.max(probs, axis=1)
-    predictions = np.argmax(probs, axis=1)
-    accuracies = (predictions == labels)
-
-    ece = 0.0
-    bin_accs, bin_confs, bin_counts = [], [], []
-
-    for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-        if np.isclose(bin_upper, 1.0):
-            in_bin = (confidences >= bin_lower) & (confidences <= bin_upper)
-        else:
-            in_bin = (confidences >= bin_lower) & (confidences < bin_upper)
-
-        prop_in_bin = in_bin.mean()
-        if prop_in_bin > 0:
-            bin_accuracy = accuracies[in_bin].mean()
-            bin_confidence = confidences[in_bin].mean()
-            bin_accs.append(bin_accuracy)
-            bin_confs.append(bin_confidence)
-            bin_counts.append(prop_in_bin)
-            ece += np.abs(bin_confidence - bin_accuracy) * prop_in_bin
-
-            print(f"Bin [{bin_lower:.2f}, {bin_upper:.2f}]: "
-                  f"Confidence = {bin_confidence:.2f}, Accuracy = {bin_accuracy:.2f}, "
-                  f"Proportion = {prop_in_bin:.2f}")
-
-    return ece, bin_accs, bin_confs
 
 
 # SIYI:
@@ -126,12 +126,6 @@ def run_experiment_simple(
         trg_eval_y = trg_val_y
 
         # Train source model.
-        '''
-        source_model = new_model_simple(model, model_params)
-        source_model.fit(src_tr_x, src_tr_y)
-        _, src_acc = source_model.evaluate(src_val_x, src_val_y)
-        _, target_acc = source_model.evaluate(trg_eval_x, trg_eval_y)
-        '''
         source_model = new_model_simple(model, model_params)
         source_model.fit(src_tr_x, src_tr_y)  # Train the source domain model
         src_acc = source_model.score(src_val_x, src_val_y)  # Evaluate the accuracy on the source domain validation set
@@ -157,7 +151,7 @@ def run_experiment_simple(
         gradual_probs = student.predict_proba(trg_eval_x)  ######Add this line######
         gradual_ece, gradual_bin_accs, gradual_bin_confs = calculate_ece(gradual_probs,
                                                                          trg_eval_y)  ######Add this line######
-
+        '''
         # Direct bootstrap to target.
         print("\n\n Direct bootstrap to target:")
         teacher = new_model_simple(model, model_params)
@@ -177,10 +171,14 @@ def run_experiment_simple(
             target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
         for i, acc in enumerate(all_accuracies):
             print(f"Direct bootstrap to all unsup data accuracy after step {i+1}: {acc * 100:.2f}%")
+        '''
 
+        return (src_acc, target_acc, gradual_accuracies, src_probs, gradual_probs,
+                src_ece, src_bin_accs, src_bin_confs, gradual_ece, gradual_bin_accs, gradual_bin_confs)
+        '''
         return (src_acc, target_acc, gradual_accuracies, target_accuracies, all_accuracies, src_probs, gradual_probs,
                 src_ece, src_bin_accs, src_bin_confs, gradual_ece, gradual_bin_accs, gradual_bin_confs)
-
+        '''
 
     results = []
     for i in range(num_runs):

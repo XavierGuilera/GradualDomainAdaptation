@@ -10,8 +10,8 @@ def plot_results(model):
     with open(f'/share/iscf/GradualDomainAdaptation/saved_files/rot_mnist_60_conv_{model}.dat', 'rb') as file:
         results = pickle.load(file)
     print(results)
-    # experiments = ["Gradual", "Boot2Target", "Boot2Unsupervised"]
-    experiments = ["Gradual"]
+    experiments = ["Gradual", "Boot2Target", "Boot2Unsupervised"]
+    # experiments = ["Gradual"]
     idx = 2
     plt.figure(figsize=(14, 10))
     for exp in experiments:
@@ -73,15 +73,25 @@ if __name__ == "__main__":
     KNN_NoKernel = {'base_model': 'KNN without kernel', 'n_neighbours': 10, 'weights': 'distance', 'id': 'KNN_NoKernel'}
     KNN_Kernel = {'base_model': 'KNN with kernel', 'n_neighbours': 10, 'weights': 'gaussian', 'id': 'KNN_Kernel'}
 
-    LR1 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 0.1, 'solver': 'lbfgs', 'max_iter': 1000, 'id': 'LR1'}
-    LR2 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 10, 'solver': 'lbfgs', 'max_iter': 1000, 'id': 'LR2'}
+    LR1 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 0.1, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR1'}
+    LR2 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 1, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR2'}
+    LR3 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 10, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR3'}
+    LR4 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 100, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR4'}
+    LR5 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 1000, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR5'}
+    LR6 = {'base_model': 'Logistic Regression', 'penalty': 'l2', 'C': 10000, 'solver': 'lbfgs', 'max_iter': 1000,
+           'id': 'LR6'}
 
     RFC = {'base_model': 'Random Forest', 'id': 'Random Forest'}
     LGBM = {'base_model': 'LGBM', 'id': 'LGBM'}
     LDA = {'base_model': 'LDA', 'id': 'LDA'}
     GNB = {'base_model': 'GaussianNB', 'id': 'GNB'}
 
-    models = [KNN_NoKernel, KNN_Kernel, LR1, LR2, RFC, LGBM]
+    models = [LR2, LR3, LR4, LR5, LR6]
 
     for i in range(len(models)):
         model = models[i]['id']
