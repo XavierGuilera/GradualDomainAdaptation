@@ -6,11 +6,9 @@ from tensorflow.keras import regularizers
 from tensorflow.keras import losses
 
 
-# Models.
-
 def linear_model(num_labels, input_shape, l2_reg=0.02):
     linear_model = keras.models.Sequential([
-    keras.layers.Flatten(input_shape=input_shape),
+    keras.layers.Flatten(input_shape=input_shape), 
     keras.layers.Dense(num_labels, activation=None, name='out',
         kernel_regularizer=regularizers.l2(l2_reg))
     ])
@@ -29,31 +27,48 @@ def linear_softmax_model(num_labels, input_shape, l2_reg=0.02):
 def mlp_softmax_model(num_labels, input_shape, l2_reg=0.02):
     linear_model = keras.models.Sequential([
     keras.layers.Flatten(input_shape=input_shape),
-    keras.layers.Dense(32, activation=tf.nn.relu,
+    keras.layers.Dense(32, activation=tf.nn.relu, 
         kernel_regularizer=regularizers.l2(0.0)),
     keras.layers.Dense(32, activation=tf.nn.relu,
         kernel_regularizer=regularizers.l2(0.0)),
-    keras.layers.BatchNormalization(),
+    keras.layers.BatchNormalization(), 
     keras.layers.Dense(num_labels, activation=tf.nn.softmax, name='out',
         kernel_regularizer=regularizers.l2(l2_reg))
     ])
     return linear_model
 
+class TemperatureScaling(tf.keras.layers.Layer):
+    def __init__(self,initial_temperature=1.0,**kwargs):
+        super(TemperatureScaling,self).__init__(**kwargs)
+        self.raw_temperature = tf.Variable(initial_temperature, trainable=True, dtype=tf.float32)
 
-def simple_softmax_conv_model(num_labels, hidden_nodes=32, input_shape=(28,28,1), l2_reg=0.0):
-    return keras.models.Sequential([
-    keras.layers.Conv2D(hidden_nodes, (5,5), (2, 2), activation=tf.nn.relu,
-                           padding='same', input_shape=input_shape),
-    keras.layers.Conv2D(hidden_nodes, (5,5), (2, 2), activation=tf.nn.relu,
-                           padding='same'),
-    keras.layers.Conv2D(hidden_nodes, (5,5), (2, 2), activation=tf.nn.relu,
-                           padding='same'),
-    keras.layers.Dropout(0.5),
-    keras.layers.BatchNormalization(),
-    keras.layers.Flatten(name='after_flatten'),
-    # keras.layers.Dense(64, activation=tf.nn.relu),
-    keras.layers.Dense(num_labels, activation=tf.nn.softmax, name='out')
-    ])
+    def call(self,logits):
+        constrained_temperature = tf.maximum(self.raw_temperature, 1e-6)  
+        return logits / constrained_temperature
+
+
+def simple_softmax_conv_model(num_labels, hidden_nodes=32, input_shape=(28, 28, 1), l2_reg=0.0):
+    inputs = keras.layers.Input(shape=input_shape)  
+    x = keras.layers.Conv2D(hidden_nodes, (5, 5), (2, 2), activation=tf.nn.relu, padding='same')(inputs)
+    x = keras.layers.Conv2D(hidden_nodes, (5, 5), (2, 2), activation=tf.nn.relu, padding='same')(x)
+    x = keras.layers.Conv2D(hidden_nodes, (5, 5), (2, 2), activation=tf.nn.relu, padding='same')(x)
+    x = keras.layers.Dropout(0.5)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Flatten(name='after_flatten')(x)
+
+    # Output logits (without softmax, for temperature calibration)
+    logits = keras.layers.Dense(num_labels, activation=None, name='logits')(x)
+
+    # Directly output softmax probability distribution
+    softmax_output = keras.layers.Activation('softmax', name='softmax_output')(logits)
+
+    # Create the complete model
+    model = tf.keras.Model(inputs=inputs, outputs=softmax_output, name="cnn_without_temperature")
+
+    # Return the model and temperature calibration layer
+    temperature_layer = TemperatureScaling()
+    return model, temperature_layer
+
 
 
 def deeper_softmax_conv_model(num_labels, hidden_nodes=32, input_shape=(28,28,1), l2_reg=0.0):
@@ -94,7 +109,7 @@ def keras_mnist_model(num_labels, input_shape=(28,28,1)):
                      activation='relu',
                      input_shape=input_shape))
     model.add(keras.layers.Conv2D(64, (3, 3), activation='relu'))
-    model.add(keras.layers.MaxPooling2D(pool_size=(2, 2)))
+    model.add(keras.layers.MaxPooling2D(pool_size=(2, 2))) 
     model.add(keras.layers.Dropout(0.25))
     model.add(keras.layers.Flatten())
     model.add(keras.layers.Dense(128, activation='relu'))
@@ -132,12 +147,11 @@ def papernot_softmax_model(num_labels, input_shape=(28,28,1), l2_reg=0.0):
 
 
 # Losses.
-
 def sparse_categorical_hinge(num_classes):
     def loss(y_true,y_pred):
         y_true = tf.reduce_mean(y_true, axis=1)
-        y_true = tf.one_hot(tf.cast(y_true, dtype=tf.int32), depth=num_classes)
-        return losses.categorical_hinge(y_true, y_pred)
+        y_true = tf.one_hot(tf.cast(y_true, dtype=tf.int32), depth=num_classes) 
+        return losses.categorical_hinge(y_true, y_pred) 
     return loss
 
 

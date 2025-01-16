@@ -19,8 +19,8 @@ import lightgbm as lgb
 import logging
 import random
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
-#logging.getLogger("lightgbm").setLevel(logging.ERROR)
 
 def calculate_ece(probs, labels, num_bins=10):
     bin_boundaries = np.linspace(0.0, 1.0, num_bins + 1)
@@ -60,17 +60,17 @@ def gaussian_kernel(distances):
     return weights
 
 def new_model_simple(seed=None):
-    #model = LogisticRegression(penalty='l2', C=10000, solver='lbfgs',max_iter=1000,random_state=seed)  
+    #model = LogisticRegression(penalty='l2', C=10000, solver='lbfgs',max_iter=1000)  
     # model = RandomForestClassifier(
     #     n_estimators=100,  
     #     max_depth=50,  
     #     min_samples_split=5, 
     #     min_samples_leaf=2,  
     #     bootstrap=True,  
-    #     random_state=42  
+    #     random_state=seed  
     # )
     #model = GaussianNB()
-    model = SVC(kernel='linear',probability=True,C=10000,class_weight='balanced',random_state=seed)
+    model = SVC(kernel='linear',probability=True,C=0.01,class_weight='balanced',random_state=seed)
     #model = SVC(kernel='rbf',probability=True,C=1.0, gamma=0.1,class_weight='balanced')
     #model = LDA()
     # model = lgb.LGBMClassifier(
@@ -201,6 +201,9 @@ def run_experiment_simple(
         trg_eval_x = trg_val_x
         trg_eval_y = trg_val_y
 
+        # trg_eval_x = trg_test_x
+        # trg_eval_y = trg_test_y
+
         source_model = new_model_simple(seed)
         source_model.fit(src_tr_x, src_tr_y) 
         src_acc = source_model.score(src_val_x, src_val_y)  
@@ -213,7 +216,7 @@ def run_experiment_simple(
         print("\n\n Gradual self-training:")
         teacher = new_model_simple(seed)
         teacher.fit(src_tr_x, src_tr_y)  
-        gradual_accuracies, student = utils.gradual_self_train_simple(
+        gradual_accuracies, student = utils.gradual_self_train_simple_pl_pseudo(
             student_func, teacher, inter_x, inter_y, interval, soft=soft)
         
         # Append the final accuracy to the list of gradual accuracies
@@ -233,7 +236,7 @@ def run_experiment_simple(
 
         plt.xlabel('Iteration Step')
         plt.ylabel('Accuracy')
-        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training (Seed {seed})')
+        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training')
         plt.legend()
         plt.grid()
         plt.show()
@@ -274,6 +277,110 @@ def run_experiment_simple(
     # print('Saving to ' + save_file)
     # pickle.dump(results, open(save_file, "wb"))
 
+def run_experiment_simple_last_pl(
+    dataset_func, n_classes, input_shape, save_file, model_func=new_model_simple,
+    interval=2000, soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
+
+    (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
+        trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
+
+    if num_repeats is None:
+        num_repeats = int(inter_x.shape[0] / interval)
+
+    def student_func(teacher):
+        return teacher
+
+    def run(seed):
+        utils.rand_seed(seed)
+        #print("Random state at start:", np.random.get_state()[1][0])
+
+        trg_eval_x = trg_val_x
+        trg_eval_y = trg_val_y
+
+        # trg_eval_x = trg_test_x
+        # trg_eval_y = trg_test_y
+
+         # Split the validation set into a calibration set and a final validation set
+        calib_split = int(len(trg_eval_x) * 0.3)  # Use 30% of the data for calibration
+        calib_x, eval_x = trg_eval_x[:calib_split], trg_eval_x[calib_split:]
+        calib_y, eval_y = trg_eval_y[:calib_split], trg_eval_y[calib_split:]
+
+        source_model = new_model_simple(seed)
+        source_model.fit(src_tr_x, src_tr_y) 
+        src_acc = source_model.score(src_val_x, src_val_y)  
+        target_acc = source_model.score(eval_x, eval_y)  
+        print(f"Source validation accuracy (seed {seed}): {src_acc * 100:.2f}%")
+        print(f"Target validation accuracy (seed {seed}): {target_acc * 100:.2f}%")
+
+        
+        # Gradual self-training.
+        print("\n\n Gradual self-training:")
+        teacher = new_model_simple(seed)
+        teacher.fit(src_tr_x, src_tr_y)  
+        gradual_accuracies, student = utils.gradual_self_train_simple(
+            student_func, teacher, inter_x, inter_y, interval, soft=soft)
+        
+        print("\nCalibrating the student model:")
+        calibrator = CalibratedClassifierCV(student, method='sigmoid', cv='prefit')
+        calibrated_student = calibrator.fit(calib_x, calib_y)
+
+        eval_acc = calibrated_student.score(eval_x, eval_y)
+        
+        gradual_accuracies.append(eval_acc)
+        
+        for i, acc in enumerate(gradual_accuracies):
+            print(f"Gradual self-training accuracy after step {i+1}: {acc * 100:.2f}%")
+
+        # Draw a graph of accuracy changes
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(gradual_accuracies) + 1), gradual_accuracies, label='Gradual Self-Training', marker='o')
+        plt.axhline(y=src_acc, color='r', linestyle='--', label=f'Source Acc: {src_acc * 100:.2f}%')
+        plt.axhline(y=target_acc, color='g', linestyle='--', label=f'Target Acc: {target_acc * 100:.2f}%')
+        plt.axhline(y=gradual_accuracies[-1], color='b', linestyle='--', label=f'Final Gradual Self-Training Acc: {gradual_accuracies[-1] * 100:.2f}%')
+        plt.ylim(0, max(src_acc * 1.1, max(gradual_accuracies) * 1.1))
+
+        plt.xlabel('Iteration Step')
+        plt.ylabel('Accuracy')
+        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        # Calculate and draw ECE image
+        # ECE calculation of source model
+        src_probs = source_model.predict_proba(src_val_x)
+        src_ece, src_bin_accs, src_bin_confs = calculate_ece(src_probs, src_val_y)
+        print(f"Source model ECE: {src_ece:.4f}")
+        print(src_bin_accs)
+        print(src_bin_confs)
+
+        # ECE calculation of target model
+        probs = calibrated_student.predict_proba(eval_x)
+        ece, bin_accs, bin_confs = calculate_ece(probs, eval_y)
+        print(f"Gradual self-training ECE: {ece:.4f}")
+        print(bin_accs)
+        print(bin_confs)
+        
+        # plot ECE 
+        plt.figure()
+        plt.plot(bin_confs, bin_accs, marker='o', linestyle='-', label=f'Gradual Self-Training (ECE: {ece:.4f})')
+        plt.plot(src_bin_confs, src_bin_accs, marker='x', linestyle='-', label=f'Source Model (ECE: {src_ece:.4f})')
+        plt.plot([0, 1], [0, 1], 'k--', label='Perfect Calibration')
+        plt.xlabel('Confidence')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy vs Confidence (ECE)')
+        plt.legend()
+        plt.show()
+
+        return src_acc, target_acc, gradual_accuracies
+
+
+    results = []
+    for i in range(num_runs):
+        utils.rand_seed(i)
+        results.append(run(i))
+    # print('Saving to ' + save_file)
+    # pickle.dump(results, open(save_file, "wb"))
 
 
    
@@ -310,7 +417,7 @@ def run_experiment(
     if num_repeats is None:
         num_repeats = int(inter_x.shape[0] / interval)
     def new_model():
-        model = model_func(n_classes, input_shape=input_shape)
+        model,_ = model_func(n_classes, input_shape=input_shape)
         compile_model(model, loss)
         return model
     def student_func(teacher):
@@ -355,7 +462,7 @@ def run_experiment(
 
         plt.xlabel('Iteration Step')
         plt.ylabel('Accuracy')
-        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training (Seed {seed})-CNN')
+        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training')
         plt.legend()
         plt.grid()
         plt.show()
@@ -385,13 +492,13 @@ def run_experiment(
         return src_acc, target_acc, gradual_accuracies
 
         # # Train to target.
-        # print("\n\n Direct boostrap to target:")  #直接引入目标领域的无监督数据
+        # print("\n\n Direct boostrap to target:")  
         # teacher = new_model()
         # teacher.set_weights(source_model.get_weights())
         # target_accuracies, _ = utils.self_train(
         #     student_func, teacher, dir_inter_x, epochs=epochs, target_x=trg_eval_x,
         #     target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
-        # print("\n\n Direct boostrap to all unsup data:") #直接使用所有中间域的无监督数据
+        # print("\n\n Direct boostrap to all unsup data:") 
         # teacher = new_model()
         # teacher.set_weights(source_model.get_weights())
         # all_accuracies, _ = utils.self_train(
@@ -402,8 +509,256 @@ def run_experiment(
     results = []
     for i in range(num_runs):
         results.append(run(i))
-    print('Saving to ' + save_file)
-    pickle.dump(results, open(save_file, "wb"))
+    # print('Saving to ' + save_file)
+    # pickle.dump(results, open(save_file, "wb"))
+
+def run_experiment_with_temperature(
+    dataset_func, n_classes, input_shape, save_file, model_func=models.simple_softmax_conv_model,
+    interval=2000, epochs=10, loss='ce', soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
+    (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
+        trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
+    if soft: 
+        src_tr_y = to_categorical(src_tr_y)
+        src_val_y = to_categorical(src_val_y)
+        trg_eval_y = to_categorical(trg_eval_y)
+        dir_inter_y = to_categorical(dir_inter_y)
+        inter_y = to_categorical(inter_y)
+        trg_test_y = to_categorical(trg_test_y)
+    if num_repeats is None:
+        num_repeats = int(inter_x.shape[0] / interval)
+    def new_model():
+        model, temperature_layer = model_func(n_classes, input_shape=input_shape)
+        dummy_input = tf.random.normal([1] + list(input_shape))
+        _ = model(dummy_input)  # Initialize the model
+        compile_model(model, loss)
+        return model, temperature_layer
+    def student_func(teacher):
+        return teacher
+    def run(seed):
+        utils.rand_seed(seed)
+        trg_eval_x = trg_val_x
+        trg_eval_y = trg_val_y
+        # Train source model.
+        source_model,_ = new_model()
+        source_model.fit(src_tr_x, src_tr_y, epochs=epochs, verbose=False)
+        _, src_acc = source_model.evaluate(src_val_x, src_val_y)
+        _, target_acc = source_model.evaluate(trg_eval_x, trg_eval_y)
+        # Gradual self-training.
+        print("\n\n Gradual self-training:")
+        teacher, temperature_layer = new_model()
+        teacher.set_weights(source_model.get_weights()) 
+        gradual_accuracies, student = utils.gradual_self_train_NN(
+            student_func, teacher, inter_x, inter_y, interval, epochs=epochs, soft=soft,
+            confidence_q=conf_q,temperature_layer=temperature_layer)
+        # Validation set evaluation phase
+        logits_model = tf.keras.Model(inputs=student.input, outputs=student.get_layer('logits').output)
+        logits = logits_model.predict(trg_eval_x)  
+
+        # Calibrate logits using temperature calibration layer
+        calibrated_logits = temperature_layer(logits)
+
+        # Convert to calibrated probability distribution
+        calibrated_probs = tf.nn.softmax(calibrated_logits)
+
+        # Predicted category
+        predictions = tf.argmax(calibrated_probs, axis=-1).numpy()
+
+        # Calculate the accuracy after calibration
+        accuracy = tf.reduce_mean(tf.cast(predictions == trg_eval_y, tf.float32)).numpy()
+        gradual_accuracies.append(accuracy)
+
+       
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(gradual_accuracies) + 1), gradual_accuracies, label='Gradual Self-Training', marker='o')
+        plt.axhline(y=src_acc, color='r', linestyle='--', label=f'Source Acc: {src_acc * 100:.2f}%')
+        plt.axhline(y=target_acc, color='g', linestyle='--', label=f'Target Acc: {target_acc * 100:.2f}%')
+        plt.axhline(y=gradual_accuracies[-1], color='b', linestyle='--', label=f'Final Gradual Self-Training Acc: {gradual_accuracies[-1] * 100:.2f}%')
+
+        plt.xlabel('Iteration Step')
+        plt.ylabel('Accuracy')
+        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        src_probs = source_model.predict(src_val_x)
+        src_ece, src_bin_accs, src_bin_confs = calculate_ece(src_probs, src_val_y)
+        print(f"Source model ECE: {src_ece:.4f}")
+        print(src_bin_accs)
+        print(src_bin_confs)
+
+        probs = calibrated_probs
+        ece, bin_accs, bin_confs = calculate_ece(probs, trg_eval_y)
+        print(f"Gradual self-training ECE: {ece:.4f}")
+        print(bin_accs)
+        print(bin_confs)
+        
+        plt.figure()
+        plt.plot(bin_confs, bin_accs, marker='o', linestyle='-', label=f'Gradual Self-Training (ECE: {ece:.4f})')
+        plt.plot(src_bin_confs, src_bin_accs, marker='x', linestyle='-', label=f'Source Model (ECE: {src_ece:.4f})')
+        plt.plot([0, 1], [0, 1], 'k--', label='Perfect Calibration')
+        plt.xlabel('Confidence')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy vs Confidence (ECE)')
+        plt.legend()
+        plt.show()
+
+        return src_acc, target_acc, gradual_accuracies
+
+        # # Train to target.
+        # print("\n\n Direct boostrap to target:")  
+        # teacher = new_model()
+        # teacher.set_weights(source_model.get_weights())
+        # target_accuracies, _ = utils.self_train(
+        #     student_func, teacher, dir_inter_x, epochs=epochs, target_x=trg_eval_x,
+        #     target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
+        # print("\n\n Direct boostrap to all unsup data:") 
+        # teacher = new_model()
+        # teacher.set_weights(source_model.get_weights())
+        # all_accuracies, _ = utils.self_train(
+        #     student_func, teacher, inter_x, epochs=epochs, target_x=trg_eval_x,
+        #     target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
+        # return src_acc, target_acc, gradual_accuracies
+        
+    results = []
+    for i in range(num_runs):
+        results.append(run(i))
+    # print('Saving to ' + save_file)
+    # pickle.dump(results, open(save_file, "wb"))
+
+
+def run_experiment_last_temperature(
+    dataset_func, n_classes, input_shape, save_file, model_func=models.simple_softmax_conv_model,
+    interval=2000, epochs=10, loss='ce', soft=False, conf_q=0.1, num_runs=20, num_repeats=None):
+    (src_tr_x, src_tr_y, src_val_x, src_val_y, inter_x, inter_y, dir_inter_x, dir_inter_y,
+        trg_val_x, trg_val_y, trg_test_x, trg_test_y) = dataset_func()
+    if soft: 
+        src_tr_y = to_categorical(src_tr_y)
+        src_val_y = to_categorical(src_val_y)
+        trg_eval_y = to_categorical(trg_eval_y)
+        dir_inter_y = to_categorical(dir_inter_y)
+        inter_y = to_categorical(inter_y)
+        trg_test_y = to_categorical(trg_test_y)
+    if num_repeats is None:
+        num_repeats = int(inter_x.shape[0] / interval)
+    def new_model():
+        model,temperature_layer = model_func(n_classes, input_shape=input_shape)
+        dummy_input = tf.random.normal([1] + list(input_shape))
+        _ = model(dummy_input)  
+        compile_model(model, loss)
+        return model,temperature_layer
+    def student_func(teacher):
+        return teacher
+    def run(seed):
+        utils.rand_seed(seed)
+        
+        trg_eval_x = trg_val_x
+        trg_eval_y = trg_val_y
+
+        calib_split = int(len(trg_eval_x) * 0.3)  
+        calib_x, calib_y = trg_eval_x[:calib_split], trg_eval_y[:calib_split]
+        eval_x, eval_y = trg_eval_x[calib_split:], trg_eval_y[calib_split:]
+
+        # Train source model.
+        source_model,temperature_layer = new_model()
+        source_model.fit(src_tr_x, src_tr_y, epochs=epochs, verbose=False)
+        _, src_acc = source_model.evaluate(src_val_x, src_val_y)
+        _, target_acc = source_model.evaluate(eval_x, eval_y)
+
+        # Gradual self-training.
+        print("\n\n Gradual self-training:")
+        teacher,_ = new_model()
+        teacher.set_weights(source_model.get_weights()) 
+
+        gradual_accuracies, student = utils.gradual_self_train(
+            student_func, teacher, inter_x, inter_y, interval, epochs=epochs, soft=soft,
+            confidence_q=conf_q)
+        
+
+        logits_model = tf.keras.Model(inputs=student.input, outputs=student.get_layer('logits').output)
+        logits = logits_model.predict(calib_x)  
+        utils.optimize_temperature(logits, calib_y, temperature_layer)  
+
+
+        calibrated_logits = logits_model.predict(eval_x) / tf.nn.softplus(temperature_layer.raw_temperature)
+        calibrated_probs = tf.nn.softmax(calibrated_logits).numpy()
+        calibrated_predictions = tf.argmax(calibrated_probs, axis=-1)
+
+        eval_accuracy = tf.reduce_mean(tf.cast(calibrated_predictions == eval_y, tf.float32))
+
+
+        gradual_accuracies.append(eval_accuracy)
+
+        # probs = student.predict(trg_eval_x)
+        # ece, bin_accuracies, bin_confidences = calculate_ece(probs, trg_eval_y)
+        # print(f"ECE after gradual self-training: {ece:.4f}")
+
+        # plt.figure(figsize=(10, 6))
+        # plt.plot(bin_confidences, bin_accuracies, marker='o')
+        # plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+        # plt.xlabel('Confidence')
+        # plt.ylabel('Accuracy')
+        # plt.title('Accuracy vs Confidence(ECE)-CNN')
+        # plt.grid(True)
+        # plt.show()
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(gradual_accuracies) + 1), gradual_accuracies, label='Gradual Self-Training', marker='o')
+        plt.axhline(y=src_acc, color='r', linestyle='--', label=f'Source Acc: {src_acc * 100:.2f}%')
+        plt.axhline(y=target_acc, color='g', linestyle='--', label=f'Target Acc: {target_acc * 100:.2f}%')
+        plt.axhline(y=gradual_accuracies[-1], color='b', linestyle='--', label=f'Final Gradual Self-Training Acc: {gradual_accuracies[-1] * 100:.2f}%')
+
+        plt.xlabel('Iteration Step')
+        plt.ylabel('Accuracy')
+        plt.title(f'Accuracy vs. Iteration for Gradual Self-Training')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+        src_probs = source_model.predict(src_val_x)
+        src_ece, src_bin_accs, src_bin_confs = calculate_ece(src_probs, src_val_y)
+        print(f"Source model ECE: {src_ece:.4f}")
+        print(src_bin_accs)
+        print(src_bin_confs)
+
+        probs = calibrated_probs
+        ece, bin_accs, bin_confs = calculate_ece(probs, eval_y)
+        print(f"Gradual self-training ECE: {ece:.4f}")
+        print(bin_accs)
+        print(bin_confs)
+        
+        plt.figure()
+        plt.plot(bin_confs, bin_accs, marker='o', linestyle='-', label=f'Gradual Self-Training (ECE: {ece:.4f})')
+        plt.plot(src_bin_confs, src_bin_accs, marker='x', linestyle='-', label=f'Source Model (ECE: {src_ece:.4f})')
+        plt.plot([0, 1], [0, 1], 'k--', label='Perfect Calibration')
+        plt.xlabel('Confidence')
+        plt.ylabel('Accuracy')
+        plt.title('Accuracy vs Confidence (ECE)')
+        plt.legend()
+        plt.show()
+
+        return src_acc, target_acc, gradual_accuracies
+
+        # # Train to target.
+        # print("\n\n Direct boostrap to target:")  
+        # teacher = new_model()
+        # teacher.set_weights(source_model.get_weights())
+        # target_accuracies, _ = utils.self_train(
+        #     student_func, teacher, dir_inter_x, epochs=epochs, target_x=trg_eval_x,
+        #     target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
+        # print("\n\n Direct boostrap to all unsup data:") 
+        # teacher = new_model()
+        # teacher.set_weights(source_model.get_weights())
+        # all_accuracies, _ = utils.self_train(
+        #     student_func, teacher, inter_x, epochs=epochs, target_x=trg_eval_x,
+        #     target_y=trg_eval_y, repeats=num_repeats, soft=soft, confidence_q=conf_q)
+        # return src_acc, target_acc, gradual_accuracies
+        
+    results = []
+    for i in range(num_runs):
+        results.append(run(i))
+    # print('Saving to ' + save_file)
+    # pickle.dump(results, open(save_file, "wb"))
 
 
 def experiment_results(save_name):
@@ -439,12 +794,14 @@ def experiment_results(save_name):
 
 
 
-def rotated_mnist_60_conv_experiment():
-    run_experiment(
-        dataset_func=datasets.rotated_mnist_60_data_func, n_classes=10, input_shape=(28, 28, 1),
+def rotated_mnist_60_conv_experiment(seed):
+    def dataset_func():
+        return datasets.rotated_mnist_60_data_func(seed)
+    run_experiment_last_temperature(
+        dataset_func=dataset_func, n_classes=10, input_shape=(28, 28, 1),
         save_file='saved_files/rot_mnist_60_conv.dat',
         model_func=models.simple_softmax_conv_model, interval=2000, epochs=10, loss='ce',
-        soft=False, conf_q=0.1, num_runs=5)
+        soft=False, conf_q=0.1, num_runs=1)
     
 
 
@@ -465,10 +822,15 @@ def rotated_mnist_60_conv_experiment_simple(seed):
     )
 
 #Use different seed for seperate dataset
-def seed_vary():
+def seed_vary_simple():
     seeds = [0,1,2,3,4,23,44,100]
     for seed in seeds:
         rotated_mnist_60_conv_experiment_simple(seed)
+
+def seed_vary():
+    seeds = [0,1,2,3,4,23,44,100]
+    for seed in seeds:
+        rotated_mnist_60_conv_experiment(seed)
 
 
 
